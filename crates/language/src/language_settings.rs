@@ -53,6 +53,14 @@ pub fn all_language_settings<'a>(
     AllLanguageSettings::get(location, cx)
 }
 
+#[derive(Debug, Copy, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InstallDependencies {
+    #[default]
+    Automatically, // Zed manages everything (how it works today)
+    Never, // We don't do anything except error
+}
+
 /// The settings for all languages.
 #[derive(Debug, Clone)]
 pub struct AllLanguageSettings {
@@ -60,6 +68,7 @@ pub struct AllLanguageSettings {
     pub inline_completions: InlineCompletionSettings,
     defaults: LanguageSettings,
     languages: HashMap<Arc<str>, LanguageSettings>,
+    pub install_dependencies: InstallDependencies,
     pub(crate) file_types: HashMap<Arc<str>, GlobSet>,
 }
 
@@ -205,6 +214,9 @@ pub struct AllLanguageSettingsContent {
     /// The inline completion settings.
     #[serde(default)]
     pub inline_completions: Option<InlineCompletionSettingsContent>,
+    /// How zed should manage external dependencies
+    #[serde(default)]
+    pub install_dependencies: Option<InstallDependencies>,
     /// The default language settings.
     #[serde(flatten)]
     pub defaults: LanguageSettingsContent,
@@ -876,6 +888,12 @@ impl settings::Settings for AllLanguageSettings {
         }
 
         let mut copilot_enabled = default_value.features.as_ref().and_then(|f| f.copilot);
+        let install_dependencies = sources
+            .user
+            .and_then(|user| user.install_dependencies)
+            .or(default_value.install_dependencies)
+            .unwrap();
+
         let mut inline_completion_provider = default_value
             .features
             .as_ref()
@@ -968,6 +986,7 @@ impl settings::Settings for AllLanguageSettings {
                     .filter_map(|g| Some(globset::Glob::new(g).ok()?.compile_matcher()))
                     .collect(),
             },
+            install_dependencies,
             defaults,
             languages,
             file_types,

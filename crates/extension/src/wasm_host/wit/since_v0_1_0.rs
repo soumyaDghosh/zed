@@ -12,6 +12,7 @@ use isahc::config::{Configurable, RedirectPolicy};
 use language::{
     language_settings::AllLanguageSettings, LanguageServerBinaryStatus, LspAdapterDelegate,
 };
+use node_runtime::NodeAssetVersion;
 use project::project_settings::ProjectSettings;
 use semantic_version::SemanticVersion;
 use std::{
@@ -269,6 +270,7 @@ impl nodejs::Host for WasmState {
             .node_runtime
             .npm_package_latest_version(&package_name)
             .await
+            .map(|version| version.version)
             .to_wasmtime_result()
     }
 
@@ -288,9 +290,16 @@ impl nodejs::Host for WasmState {
         package_name: String,
         version: String,
     ) -> wasmtime::Result<Result<(), String>> {
+        // TODO: confirm this isn't called on any check_if_user_installed paths
         self.host
             .node_runtime
-            .npm_install_packages(&self.work_dir(), &[(&package_name, &version)])
+            .npm_install_packages(
+                &self.work_dir(),
+                &[NodeAssetVersion {
+                    name: package_name,
+                    version: version,
+                }],
+            )
             .await
             .to_wasmtime_result()
     }
